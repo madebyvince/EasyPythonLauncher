@@ -1,0 +1,8 @@
+# Easy Python Launcher has no external dependencies
+# tkinter is included with standard Python installations
+
+# If tkinter is not available on your system:
+# - On Ubuntu/Debian: sudo apt-get install python3-tk
+# - On Fedora: sudo dnf install python3-tkinter
+# - On macOS: tkinter is included with Python from python.org
+# - On Windows: tkinter is included with standard Python installation
