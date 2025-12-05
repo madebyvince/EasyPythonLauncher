@@ -33,7 +33,7 @@ Easy on the eyes for late-night scripting sessions with green console output.
 
 **No Python installation required to run the launcher itself!**
 
-1. Go to the [Releases](https://github.com/yourusername/easy-python-launcher/releases) page
+1. Go to the [Releases](https://github.com/madebyvince/EasyPythonLauncher/releases) page
 2. Download the latest `EasyPythonLauncher.exe` for Windows
 3. Run the executable - that's it!
 
@@ -53,7 +53,7 @@ If you prefer to run from source, want to modify the code, or are using Linux/ma
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/easy-python-launcher.git
+git clone https://github.com/madebyvince/EasyPythonLauncher.git
 cd easy-python-launcher
 ```
 

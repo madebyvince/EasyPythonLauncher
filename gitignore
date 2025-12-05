@@ -23,6 +23,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# PyInstaller
+*.spec
+build/
+dist/
+
 # Virtual environments
 venv/
 env/
