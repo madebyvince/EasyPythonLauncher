@@ -39,6 +39,11 @@ Easy on the eyes for late-night scripting sessions with green console output.
 
 The standalone executable doesn't require Python to be installed to run the launcher interface. However, you'll still need Python installed on your system to execute your Python scripts 😁
 
+⚠️ **Antivirus Warning**: Some antivirus software may flag the executable as a potential threat. This is a **false positive** common with PyInstaller-compiled applications. The source code is completely open and safe. If your antivirus blocks the file, you can:
+- Add it to your antivirus exceptions/whitelist
+- Scan the file on [VirusTotal](https://www.virustotal.com/) to verify it's safe
+- Build the executable yourself from source (see Option 2)
+
 **Note for Linux/macOS users**: The pre-compiled executable is Windows-only. Please use Option 2 (run from source) or build your own executable following the [BUILD.md](BUILD.md) guide.
 
 ### Option 2: Run from Source (All Platforms)
@@ -103,9 +108,16 @@ For detailed build instructions and advanced options, see [BUILD.md](BUILD.md).
 
 ## Configuration
 
-Settings are stored in your home directory:
-- Windows: `C:\Users\YourName\.easy_python_launcher_config.json`
-- Linux/macOS: `~/.easy_python_launcher_config.json`
+Settings are stored in the same directory as the application:
+- **Standalone executable**: `EasyPythonLauncher.config.json` (next to the .exe file)
+- **Running from source**: `EasyPythonLauncher.config.json` (next to the .py script)
+
+The configuration file stores:
+- Theme preference (dark/light mode)
+- Last opened folder path
+- Python interpreter location
+
+**Note**: Storing the configuration file locally (instead of in the user profile) helps reduce false positive detections from antivirus software.
 
 ## Platform Support
 
@@ -126,6 +138,35 @@ Settings are stored in your home directory:
 **Cross-Platform**: Uses platform-specific path detection to work seamlessly on Windows, Linux, and macOS.
 
 **Standalone Executable**: The compiled version bundles Python and all dependencies into a single executable using PyInstaller, making it easy to distribute and use without requiring a Python installation.
+
+## Contributing
+
+Contributions are welcome! Feel free to:
+- Report bugs
+- Suggest new features
+- Submit pull requests
+
+## FAQ
+
+### Why does my antivirus flag the executable as malicious?
+
+This is a **false positive**. PyInstaller (the tool used to create the standalone executable) packages Python and your script together in a way that some antivirus software finds suspicious. This is a well-known issue with PyInstaller.
+
+**The application is completely safe**. You can verify this by:
+- Reviewing the source code (it's completely open)
+- Scanning the file on [VirusTotal](https://www.virustotal.com/)
+- Building the executable yourself from the source code
+
+**Solution**: Add the executable to your antivirus exceptions/whitelist.
+
+### The launcher can't find Python on my system
+
+If you're using the standalone executable and it can't find Python:
+1. Make sure Python is installed on your system
+2. Go to **Settings > Select Python Interpreter** in the launcher menu
+3. Browse to your `python.exe` location (usually `C:\Python3xx\python.exe` or `%LOCALAPPDATA%\Programs\Python\Python3xx\python.exe`)
+
+The launcher will remember your choice for future sessions.
 
 ## Contributing
 

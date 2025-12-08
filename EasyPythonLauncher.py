@@ -2,11 +2,12 @@ import os
 import sys
 import subprocess
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 from pathlib import Path
 import threading
 import json
 import string
+import shutil
 
 
 class PythonScriptRunner:
@@ -16,7 +17,15 @@ class PythonScriptRunner:
         self.root.geometry("1000x600")
         
         # Configuration file
-        self.config_file = os.path.join(os.path.expanduser('~'), '.easy_python_launcher_config.json')
+        # Get the directory where the executable/script is located
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable
+            app_dir = os.path.dirname(sys.executable)
+        else:
+            # Running as script
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        self.config_file = os.path.join(app_dir, 'EasyPythonLauncher.config.json')
         
         # Variables
         self.selected_file = None
@@ -33,6 +42,11 @@ class PythonScriptRunner:
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
         view_menu.add_checkbutton(label="Dark Mode", variable=self.theme_var, 
                                    command=self.toggle_theme)
+        
+        # Settings Menu
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Settings", menu=settings_menu)
+        settings_menu.add_command(label="Select Python Interpreter...", command=self.select_python_interpreter)
         
         # Main display grid configuration
         self.root.grid_rowconfigure(0, weight=1)
@@ -123,6 +137,156 @@ class PythonScriptRunner:
         
         # Initialize folder tree and drives
         self.populate_tree()
+    
+    def get_python_executable(self):
+        """Get the correct Python executable path, even when frozen with PyInstaller"""
+        # First, check if we have a saved Python path in config
+        saved_python = self.load_python_path()
+        if saved_python and os.path.exists(saved_python):
+            return saved_python
+        
+        # Check if running as a PyInstaller bundle
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable - find Python in PATH
+            python_exec = shutil.which('python')
+            if not python_exec:
+                # Try python3 on Linux/Mac
+                python_exec = shutil.which('python3')
+            if not python_exec:
+                # Try common Windows locations
+                common_paths = [
+                    r'C:\Python313\python.exe',
+                    r'C:\Python312\python.exe',
+                    r'C:\Python311\python.exe',
+                    r'C:\Python310\python.exe',
+                    r'C:\Python39\python.exe',
+                    r'C:\Program Files\Python313\python.exe',
+                    r'C:\Program Files\Python312\python.exe',
+                    r'C:\Program Files\Python311\python.exe',
+                    r'C:\Program Files\Python310\python.exe',
+                    r'C:\Program Files\Python39\python.exe',
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python313\python.exe'),
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python312\python.exe'),
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python311\python.exe'),
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python310\python.exe'),
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python39\python.exe'),
+                ]
+                for path in common_paths:
+                    if os.path.exists(path):
+                        python_exec = path
+                        break
+            
+            if not python_exec:
+                # Python not found - ask user to select it
+                python_exec = self.ask_for_python_path()
+                if not python_exec:
+                    raise FileNotFoundError(
+                        "Python interpreter not found!\n\n"
+                        "Please install Python or select its location via Settings > Select Python Interpreter."
+                    )
+            
+            # Save the found Python path for future use
+            self.save_python_path(python_exec)
+            return python_exec
+        else:
+            # Running as a normal Python script
+            python_exec = sys.executable
+            self.save_python_path(python_exec)
+            return python_exec
+    
+    def ask_for_python_path(self):
+        """Ask user to manually select the Python executable"""
+        result = messagebox.askyesno(
+            "Python Not Found",
+            "Python interpreter was not found automatically.\n\n"
+            "Would you like to select the location of python.exe manually?"
+        )
+        
+        if result:
+            if sys.platform == 'win32':
+                filetypes = [("Python Executable", "python.exe"), ("All Files", "*.*")]
+            else:
+                filetypes = [("Python Executable", "python*"), ("All Files", "*.*")]
+            
+            filename = filedialog.askopenfilename(
+                title="Select Python Interpreter",
+                filetypes=filetypes
+            )
+            
+            if filename and os.path.exists(filename):
+                # Verify it's actually a Python executable
+                try:
+                    result = subprocess.run([filename, "--version"], 
+                                          capture_output=True, 
+                                          text=True, 
+                                          timeout=5)
+                    if "Python" in result.stdout or "Python" in result.stderr:
+                        return filename
+                    else:
+                        messagebox.showerror("Invalid File", 
+                                           "The selected file doesn't appear to be a valid Python interpreter.")
+                except Exception:
+                    messagebox.showerror("Invalid File", 
+                                       "The selected file doesn't appear to be a valid Python interpreter.")
+        
+        return None
+    
+    def select_python_interpreter(self):
+        """Menu option to manually select Python interpreter"""
+        if sys.platform == 'win32':
+            filetypes = [("Python Executable", "python.exe"), ("All Files", "*.*")]
+        else:
+            filetypes = [("Python Executable", "python*"), ("All Files", "*.*")]
+        
+        filename = filedialog.askopenfilename(
+            title="Select Python Interpreter",
+            filetypes=filetypes
+        )
+        
+        if filename and os.path.exists(filename):
+            # Verify it's actually a Python executable
+            try:
+                result = subprocess.run([filename, "--version"], 
+                                      capture_output=True, 
+                                      text=True, 
+                                      timeout=5)
+                if "Python" in result.stdout or "Python" in result.stderr:
+                    self.save_python_path(filename)
+                    version_info = result.stdout.strip() or result.stderr.strip()
+                    messagebox.showinfo("Success", 
+                                      f"Python interpreter set successfully!\n\n{version_info}\n\nLocation: {filename}")
+                else:
+                    messagebox.showerror("Invalid File", 
+                                       "The selected file doesn't appear to be a valid Python interpreter.")
+            except Exception as e:
+                messagebox.showerror("Error", 
+                                   f"Could not verify Python executable:\n{str(e)}")
+    
+    def save_python_path(self, python_path):
+        """Save the Python executable path to config"""
+        try:
+            config = {}
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+            
+            config['python_path'] = python_path
+            
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f)
+        except Exception as e:
+            print(f"Error while saving Python path: {e}")
+    
+    def load_python_path(self):
+        """Load the saved Python executable path from config"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    return config.get('python_path', None)
+        except Exception:
+            pass
+        return None
         
     def populate_tree(self):
         """Generate tree content with folders and all drives"""
@@ -140,6 +304,11 @@ class PythonScriptRunner:
             root_node = self.tree_folders.insert('', 'end', text=root_path, 
                                                 values=[root_path], open=True)
             self.load_subdirectories(root_node, root_path)
+        
+        # Restore last opened folder
+        last_folder = self.load_last_folder()
+        if last_folder and os.path.exists(last_folder):
+            self.expand_to_folder(last_folder)
     
     def get_available_drives(self):
         """Returns the list of all available drives for Windows"""
@@ -152,6 +321,61 @@ class PythonScriptRunner:
             if os.path.exists(drive):
                 drives.append(drive)
         return drives
+    
+    def expand_to_folder(self, folder_path):
+        """Expand the tree and select a specific folder"""
+        # Normalize path
+        folder_path = os.path.normpath(folder_path)
+        
+        # Find the root node that contains this path
+        for root_item in self.tree_folders.get_children():
+            root_path = self.tree_folders.item(root_item)['values'][0]
+            root_path = os.path.normpath(root_path)
+            
+            # Check if folder_path is under this root
+            if folder_path.startswith(root_path):
+                # Expand this root
+                self._expand_node(root_item, root_path)
+                
+                # Build the path segments
+                relative_path = folder_path[len(root_path):].strip(os.sep)
+                if relative_path:
+                    path_parts = relative_path.split(os.sep)
+                    current_item = root_item
+                    current_path = root_path
+                    
+                    # Navigate through each part of the path
+                    for part in path_parts:
+                        current_path = os.path.join(current_path, part)
+                        found = False
+                        
+                        # Search for this part in the children
+                        for child in self.tree_folders.get_children(current_item):
+                            child_path = self.tree_folders.item(child)['values'][0]
+                            if os.path.normpath(child_path) == os.path.normpath(current_path):
+                                self._expand_node(child, child_path)
+                                current_item = child
+                                found = True
+                                break
+                        
+                        if not found:
+                            break
+                    
+                    # Select and show the final folder
+                    if os.path.normpath(self.tree_folders.item(current_item)['values'][0]) == folder_path:
+                        self.tree_folders.selection_set(current_item)
+                        self.tree_folders.see(current_item)
+                        self.display_python_files(folder_path)
+                break
+    
+    def _expand_node(self, item, path):
+        """Expand a tree node and load its subdirectories"""
+        children = self.tree_folders.get_children(item)
+        # Check if node has a dummy child (not yet expanded)
+        if len(children) == 1 and not self.tree_folders.item(children[0])['values']:
+            self.tree_folders.delete(children[0])
+            self.load_subdirectories(item, path)
+        self.tree_folders.item(item, open=True)
         
     def load_subdirectories(self, parent, path):
         """Load all subdirectories of a folder"""
@@ -192,6 +416,7 @@ class PythonScriptRunner:
         # List all .py files in the selected folder
         folder_path = self.tree_folders.item(item)['values'][0]
         self.display_python_files(folder_path)
+        self.save_last_folder(folder_path)
     
     def display_python_files(self, folder_path):
         """Display all .py files in the selected folder"""
@@ -241,7 +466,7 @@ class PythonScriptRunner:
                 self.selected_label.config(text=f"Selected: {filename} (Running ▶)", foreground='green')
             else:
                 self.stop_button.config(state=tk.DISABLED)
-                self.selected_label.config(text=f"Selected: {filename}", foreground='yellow')
+                self.selected_label.config(text=f"Selected: {filename}", foreground='blue')
     
     def run_script(self):
         """Execute the selected script"""
@@ -275,9 +500,12 @@ class PythonScriptRunner:
             # Get script path
             script_dir = os.path.dirname(script_path)
             
+            # Get the correct Python executable
+            python_exec = self.get_python_executable()
+            
             # Start the process
             process = subprocess.Popen(
-                [sys.executable, script_path],
+                [python_exec, script_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -314,7 +542,7 @@ class PythonScriptRunner:
                 self.root.after(0, lambda: self.stop_button.config(state=tk.DISABLED))
                 filename = os.path.basename(script_path)
                 self.root.after(0, lambda: self.selected_label.config(
-                    text=f"Selected: {filename}", foreground='yellow'))
+                    text=f"Selected: {filename}", foreground='blue'))
     
     def stop_script(self):
         """Stop the currently selected running script"""
@@ -331,7 +559,7 @@ class PythonScriptRunner:
                 # Update UI
                 self.stop_button.config(state=tk.DISABLED)
                 filename = os.path.basename(self.selected_file)
-                self.selected_label.config(text=f"Selected: {filename}", foreground='yellow')
+                self.selected_label.config(text=f"Selected: {filename}", foreground='blue')
             except Exception as e:
                 self.console.insert(tk.END, f"\n❌ Error while stopping: {str(e)}\n")
                 self.console.see(tk.END)
@@ -370,6 +598,32 @@ class PythonScriptRunner:
         self.dark_mode = self.theme_var.get()
         self.apply_theme()
         self.save_theme_preference()
+    
+    def save_last_folder(self, folder_path):
+        """Save the last opened folder path"""
+        try:
+            config = {}
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+            
+            config['last_folder'] = folder_path
+            
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f)
+        except Exception as e:
+            print(f"Error while saving last folder: {e}")
+    
+    def load_last_folder(self):
+        """Load the last opened folder path"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    return config.get('last_folder', None)
+        except Exception:
+            pass
+        return None
     
     def apply_theme(self):
         """Apply theme to interface"""
