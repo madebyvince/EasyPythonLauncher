@@ -15,6 +15,7 @@ class PythonScriptRunner:
         self.root = root
         self.root.title("Easy Python Launcher")
         self.root.geometry("1000x600")
+        self.root.resizable(0, 0)
         
         # Configuration file
         # Get the directory where the executable/script is located
@@ -148,13 +149,32 @@ class PythonScriptRunner:
         # Check if running as a PyInstaller bundle
         if getattr(sys, 'frozen', False):
             # Running as compiled executable - find Python in PATH
-            python_exec = shutil.which('python')
+            # Try pythonw first (no console window), fallback to python
+            python_exec = shutil.which('pythonw')
+            if not python_exec:
+                python_exec = shutil.which('python')
             if not python_exec:
                 # Try python3 on Linux/Mac
                 python_exec = shutil.which('python3')
             if not python_exec:
-                # Try common Windows locations
+                # Try common Windows locations (pythonw.exe preferred)
                 common_paths = [
+                    r'C:\Python313\pythonw.exe',
+                    r'C:\Python312\pythonw.exe',
+                    r'C:\Python311\pythonw.exe',
+                    r'C:\Python310\pythonw.exe',
+                    r'C:\Python39\pythonw.exe',
+                    r'C:\Program Files\Python313\pythonw.exe',
+                    r'C:\Program Files\Python312\pythonw.exe',
+                    r'C:\Program Files\Python311\pythonw.exe',
+                    r'C:\Program Files\Python310\pythonw.exe',
+                    r'C:\Program Files\Python39\pythonw.exe',
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python313\pythonw.exe'),
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python312\pythonw.exe'),
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python311\pythonw.exe'),
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python310\pythonw.exe'),
+                    os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python39\pythonw.exe'),
+                    # Fallback to python.exe if pythonw.exe not found
                     r'C:\Python313\python.exe',
                     r'C:\Python312\python.exe',
                     r'C:\Python311\python.exe',
@@ -199,12 +219,16 @@ class PythonScriptRunner:
         result = messagebox.askyesno(
             "Python Not Found",
             "Python interpreter was not found automatically.\n\n"
-            "Would you like to select the location of python.exe manually?"
+            "Would you like to select the location of python.exe or pythonw.exe manually?\n\n"
+            "Note: pythonw.exe is recommended (no console window)."
         )
         
         if result:
             if sys.platform == 'win32':
-                filetypes = [("Python Executable", "python.exe"), ("All Files", "*.*")]
+                filetypes = [("Python Executable", "python*.exe"), 
+                           ("Python (no console)", "pythonw.exe"),
+                           ("Python (with console)", "python.exe"),
+                           ("All Files", "*.*")]
             else:
                 filetypes = [("Python Executable", "python*"), ("All Files", "*.*")]
             
@@ -234,12 +258,15 @@ class PythonScriptRunner:
     def select_python_interpreter(self):
         """Menu option to manually select Python interpreter"""
         if sys.platform == 'win32':
-            filetypes = [("Python Executable", "python.exe"), ("All Files", "*.*")]
+            filetypes = [("Python Executable", "python*.exe"), 
+                       ("Python (no console)", "pythonw.exe"),
+                       ("Python (with console)", "python.exe"),
+                       ("All Files", "*.*")]
         else:
             filetypes = [("Python Executable", "python*"), ("All Files", "*.*")]
         
         filename = filedialog.askopenfilename(
-            title="Select Python Interpreter",
+            title="Select Python Interpreter (pythonw.exe recommended)",
             filetypes=filetypes
         )
         
@@ -253,8 +280,9 @@ class PythonScriptRunner:
                 if "Python" in result.stdout or "Python" in result.stderr:
                     self.save_python_path(filename)
                     version_info = result.stdout.strip() or result.stderr.strip()
+                    exe_type = "pythonw.exe (no console)" if "pythonw" in filename.lower() else "python.exe (with console)"
                     messagebox.showinfo("Success", 
-                                      f"Python interpreter set successfully!\n\n{version_info}\n\nLocation: {filename}")
+                                      f"Python interpreter set successfully!\n\n{version_info}\nType: {exe_type}\n\nLocation: {filename}")
                 else:
                     messagebox.showerror("Invalid File", 
                                        "The selected file doesn't appear to be a valid Python interpreter.")
@@ -466,7 +494,7 @@ class PythonScriptRunner:
                 self.selected_label.config(text=f"Selected: {filename} (Running ▶)", foreground='green')
             else:
                 self.stop_button.config(state=tk.DISABLED)
-                self.selected_label.config(text=f"Selected: {filename}", foreground='blue')
+                self.selected_label.config(text=f"Selected: {filename}", foreground='yellow')
     
     def run_script(self):
         """Execute the selected script"""
@@ -542,7 +570,7 @@ class PythonScriptRunner:
                 self.root.after(0, lambda: self.stop_button.config(state=tk.DISABLED))
                 filename = os.path.basename(script_path)
                 self.root.after(0, lambda: self.selected_label.config(
-                    text=f"Selected: {filename}", foreground='blue'))
+                    text=f"Selected: {filename}", foreground='yellow'))
     
     def stop_script(self):
         """Stop the currently selected running script"""
@@ -559,7 +587,7 @@ class PythonScriptRunner:
                 # Update UI
                 self.stop_button.config(state=tk.DISABLED)
                 filename = os.path.basename(self.selected_file)
-                self.selected_label.config(text=f"Selected: {filename}", foreground='blue')
+                self.selected_label.config(text=f"Selected: {filename}", foreground='yellow')
             except Exception as e:
                 self.console.insert(tk.END, f"\n❌ Error while stopping: {str(e)}\n")
                 self.console.see(tk.END)
