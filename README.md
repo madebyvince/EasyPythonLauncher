@@ -16,6 +16,7 @@ A simple and elegant GUI application for browsing and executing Python scripts d
 - 🌓 **Dark/Light Mode**: Toggle between themes with your preference saved for future sessions
 - 💾 **Persistent Settings**: Your theme preference is automatically saved
 - 🖱️ **Double-Click Launch**: Quick execution by double-clicking on any .py file
+- 🐍 **Python Interpreter Selection**: Choose between installed Python versions, with support for `python.exe` and `pythonw.exe`, background validation, and persistent settings
 
 ## Screenshots
 
@@ -59,7 +60,7 @@ If you prefer to run from source, want to modify the code, or are using Linux/ma
 1. Clone this repository:
 ```bash
 git clone https://github.com/madebyvince/EasyPythonLauncher.git
-cd easy-python-launcher
+cd EasyPythonLauncher
 ```
 
 2. Run the application:
@@ -101,6 +102,24 @@ For detailed build instructions and advanced options, see [BUILD.md](BUILD.md).
 - **Visual Indicators**: Running scripts show "(Running ▶)" in green when selected
 - **Stop Specific Script**: Select the script you want to stop, then click "⬛ Stop"
 - **Console Output**: Watch real-time output in the integrated console
+
+### Selecting a Python Interpreter
+
+1. Open **Settings > Select Python Interpreter...**
+2. Browse to the desired `python.exe` or `pythonw.exe`
+3. Wait for the interpreter verification to complete
+4. Once validated, the selected interpreter is saved and used for subsequent script executions
+
+Interpreter verification runs in the background to keep the interface responsive.
+
+While verification is in progress:
+- A progress indicator is displayed
+- Launching new scripts is temporarily disabled
+- Already running scripts can still be stopped
+
+This is particularly useful when multiple Python versions are installed or when scripts require packages installed in a specific Python environment.
+
+**Note:** Python packages are installed separately for each interpreter. If a script reports `ModuleNotFoundError`, make sure the required package is installed in the selected Python environment.
 
 ### Theme Toggle
 - Go to **Display** → **Dark Mode** in the menu bar
@@ -165,15 +184,9 @@ If you're using the standalone executable and it can't find Python:
 1. Make sure Python is installed on your system
 2. Go to **Settings > Select Python Interpreter** in the launcher menu
 3. Browse to your `python.exe` location (usually `C:\Python3xx\python.exe` or `%LOCALAPPDATA%\Programs\Python\Python3xx\python.exe`)
+The selected interpreter is validated before being saved. A progress indicator is displayed during verification.
 
 The launcher will remember your choice for future sessions.
-
-## Contributing
-
-Contributions are welcome! Feel free to:
-- Report bugs
-- Suggest new features
-- Submit pull requests
 
 ## License
 

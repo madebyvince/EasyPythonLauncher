@@ -31,6 +31,7 @@ class PythonScriptRunner:
         # Variables
         self.selected_file = None
         self.running_processes = {}  # Dictionary: {script_path: process_object}
+        self.verifying_interpreter = False
         self.dark_mode = self.load_theme_preference()
         
         # Menu bar
@@ -109,7 +110,20 @@ class PythonScriptRunner:
         # Frame for buttons and information
         control_frame = ttk.Frame(right_frame)
         control_frame.pack(fill=tk.X, pady=10)
-        
+        self.verify_status = ttk.Label(
+            control_frame,
+            text=""
+        )
+        self.verify_status.pack(side=tk.LEFT, padx=5)
+
+        self.verify_progress = ttk.Progressbar(
+            control_frame,
+            mode="indeterminate",
+            length=120
+        )
+        self.verify_progress.pack(side=tk.LEFT, padx=5)
+        self.verify_progress.pack_forget()
+
         # Label for selected file
         self.selected_label = ttk.Label(control_frame, text="No file selected", 
                                        foreground='gray', font=('Arial', 9))
@@ -209,86 +223,150 @@ class PythonScriptRunner:
             self.save_python_path(python_exec)
             return python_exec
         else:
-            # Running as a normal Python script
-            python_exec = sys.executable
-            self.save_python_path(python_exec)
-            return python_exec
-    
+            # Running as a normal Python script.
+            # Do not overwrite the user's saved interpreter.
+            return sys.executable    
+            
     def ask_for_python_path(self):
-        """Ask user to manually select the Python executable"""
+        """Ask user to manually select the Python executable."""
+
         result = messagebox.askyesno(
             "Python Not Found",
             "Python interpreter was not found automatically.\n\n"
-            "Would you like to select the location of python.exe or pythonw.exe manually?\n\n"
-            "Note: pythonw.exe is recommended (no console window)."
+            "Would you like to select the location of python.exe "
+            "or pythonw.exe manually?"
         )
-        
-        if result:
-            if sys.platform == 'win32':
-                filetypes = [("Python Executable", "python*.exe"), 
-                           ("Python (no console)", "pythonw.exe"),
-                           ("Python (with console)", "python.exe"),
-                           ("All Files", "*.*")]
-            else:
-                filetypes = [("Python Executable", "python*"), ("All Files", "*.*")]
-            
-            filename = filedialog.askopenfilename(
-                title="Select Python Interpreter",
-                filetypes=filetypes
-            )
-            
-            if filename and os.path.exists(filename):
-                # Verify it's actually a Python executable
-                try:
-                    result = subprocess.run([filename, "--version"], 
-                                          capture_output=True, 
-                                          text=True, 
-                                          timeout=5)
-                    if "Python" in result.stdout or "Python" in result.stderr:
-                        return filename
-                    else:
-                        messagebox.showerror("Invalid File", 
-                                           "The selected file doesn't appear to be a valid Python interpreter.")
-                except Exception:
-                    messagebox.showerror("Invalid File", 
-                                       "The selected file doesn't appear to be a valid Python interpreter.")
-        
-        return None
-    
-    def select_python_interpreter(self):
-        """Menu option to manually select Python interpreter"""
+
+        if not result:
+            return None
+
         if sys.platform == 'win32':
-            filetypes = [("Python Executable", "python*.exe"), 
-                       ("Python (no console)", "pythonw.exe"),
-                       ("Python (with console)", "python.exe"),
-                       ("All Files", "*.*")]
+            filetypes = [
+                ("Python Executables", "python*.exe"),
+                ("All Files", "*.*")
+            ]
         else:
-            filetypes = [("Python Executable", "python*"), ("All Files", "*.*")]
-        
+            filetypes = [
+                ("Python Executables", "python*"),
+                ("All Files", "*.*")
+            ]
+
         filename = filedialog.askopenfilename(
-            title="Select Python Interpreter (pythonw.exe recommended)",
+            title="Select Python Interpreter",
             filetypes=filetypes
         )
-        
-        if filename and os.path.exists(filename):
-            # Verify it's actually a Python executable
-            try:
-                result = subprocess.run([filename, "--version"], 
-                                      capture_output=True, 
-                                      text=True, 
-                                      timeout=5)
-                if "Python" in result.stdout or "Python" in result.stderr:
-                    self.save_python_path(filename)
-                    version_info = result.stdout.strip() or result.stderr.strip()
-                    exe_type = "pythonw.exe (no console)" if "pythonw" in filename.lower() else "python.exe (with console)"
-                    messagebox.showinfo("Success", 
-                                      f"Python interpreter set successfully!\n\n{version_info}\nType: {exe_type}\n\nLocation: {filename}")
-                else:
-                    messagebox.showerror("Invalid File", 
-                                       "The selected file doesn't appear to be a valid Python interpreter.")
-            except Exception as e:
-                messagebox.showerror("Error", 
-                                   f"Could not verify Python executable:\n{str(e)}")
+
+        if not filename:
+            return None
+
+        try:
+            self.verify_python_interpreter(filename)
+            return filename
+
+        except Exception as e:
+            messagebox.showerror(
+                "Invalid Python Interpreter",
+                f"Could not verify Python executable:\n\n{e}"
+            )
+            return None
+
+    def select_python_interpreter(self):
+        """Select and verify a Python interpreter asynchronously."""
+
+        if self.verifying_interpreter:
+            return
+
+        filename = filedialog.askopenfilename(
+            title="Select Python Interpreter",
+            filetypes=[
+                ("Python Executables", "python*.exe"),
+                ("All Files", "*.*")
+            ]
+        )
+
+        if not filename:
+            return
+
+        self.verifying_interpreter = True
+
+        self.run_button.config(state=tk.DISABLED)
+
+        self.verify_status.config(
+            text="Verifying Python interpreter..."
+        )
+        self.verify_progress.pack(side=tk.LEFT, padx=5)
+        self.verify_progress.start(10)
+
+        threading.Thread(
+            target=self._verify_interpreter_worker,
+            args=(filename,),
+            daemon=True
+        ).start()
+
+
+    def _verify_interpreter_worker(self, filename):
+        """Verify Python without blocking the GUI."""
+
+        try:
+            version = self.verify_python_interpreter(filename)
+
+            self.root.after(
+                0,
+                lambda: self._finish_interpreter_verification(
+                    filename, version, None
+                )
+            )
+
+        except Exception as e:
+            error = str(e)
+
+            self.root.after(
+                0,
+                lambda: self._finish_interpreter_verification(
+                    filename, None, error
+                )
+            )
+
+
+    def _finish_interpreter_verification(
+        self, filename, version, error
+    ):
+        """Handle verification result on the Tkinter main thread."""
+
+        self.verify_progress.stop()
+        self.verify_progress.pack_forget()
+        self.verify_status.config(text="")
+
+        if error:
+            messagebox.showerror(
+                "Invalid Python Interpreter",
+                f"Verification failed:\n\n{error}"
+            )
+        else:
+            self.save_python_path(filename)
+
+            messagebox.showinfo(
+                "Python Interpreter",
+                f"Interpreter selected successfully!\n\n"
+                f"Version: {version}\n"
+                f"Path: {filename}"
+            )
+
+        self.verifying_interpreter = False
+
+        # Restore Run button only when a script is selected
+        self.run_button.config(
+            state=tk.NORMAL if self.selected_file else tk.DISABLED
+        )
+    
+        # Restore Stop only when the selected script is running
+        self.stop_button.config(
+            state=(
+                tk.NORMAL
+                if self.selected_file in self.running_processes
+                else tk.DISABLED
+            )
+        )
     
     def save_python_path(self, python_path):
         """Save the Python executable path to config"""
@@ -486,7 +564,9 @@ class PythonScriptRunner:
         if folder_selection:
             folder_path = self.tree_folders.item(folder_selection[0])['values'][0]
             self.selected_file = os.path.join(folder_path, filename)
-            self.run_button.config(state=tk.NORMAL)
+            self.run_button.config(
+                state=tk.DISABLED if self.verifying_interpreter else tk.NORMAL
+            )
             
             # Update Stop button state based on whether this script is running
             if self.selected_file in self.running_processes:
@@ -498,9 +578,14 @@ class PythonScriptRunner:
     
     def run_script(self):
         """Execute the selected script"""
-        if not self.selected_file:
+
+        # Prevent execution while verifying Python interpreter
+        if self.verifying_interpreter:
             return
-        
+
+        if not self.selected_file:
+            return        
+            
         # Check if script is already running
         if self.selected_file in self.running_processes:
             messagebox.showwarning("Already Running", 
@@ -530,6 +615,13 @@ class PythonScriptRunner:
             
             # Get the correct Python executable
             python_exec = self.get_python_executable()
+            self.root.after(
+                0,
+                lambda: self.console.insert(
+                    tk.END,
+                    f"Python utilisé : {python_exec}\n"
+                )
+            )            
             
             # Start the process
             process = subprocess.Popen(
@@ -547,19 +639,36 @@ class PythonScriptRunner:
             
             # Read the output line by line
             for line in process.stdout:
-                self.console.insert(tk.END, line)
-                self.console.see(tk.END)
-                self.root.update_idletasks()
-            
+                self.root.after(
+                    0,
+                    lambda output=line: (
+                        self.console.insert(tk.END, output),
+                        self.console.see(tk.END)
+                    )
+                )
+    
             # Wait for the end of the process
             return_code = process.wait()
             
-            self.console.insert(tk.END, f"\n=== Terminated (code: {return_code}) ===\n")
-            self.console.see(tk.END)
-            
+            self.root.after(
+                0,
+                lambda code=return_code: (
+                    self.console.insert(
+                        tk.END, f"\n=== Terminated (code: {code}) ===\n"
+                    ),
+                    self.console.see(tk.END)
+                )
+            )
+
         except Exception as e:
-            self.console.insert(tk.END, f"\n❌ Error: {str(e)}\n")
-            self.console.see(tk.END)
+            error = str(e)
+            self.root.after(
+                0,
+                lambda msg=error: (
+                    self.console.insert(tk.END, f"\n❌ Error: {msg}\n"),
+                    self.console.see(tk.END)
+                )
+            )
         finally:
             # Remove process from running processes
             if script_path in self.running_processes:
@@ -765,12 +874,49 @@ class PythonScriptRunner:
                                         selectbackground=select_bg,
                                         selectforeground='#ffffff')
 
+    def verify_python_interpreter(self, filename):
+        """Validate python.exe or pythonw.exe."""
+        filename = os.path.abspath(filename)
+
+        if not os.path.isfile(filename):
+            raise FileNotFoundError(filename)
+
+        verify_exe = filename
+
+        if os.path.basename(filename).lower() == "pythonw.exe":
+            verify_exe = os.path.join(
+                os.path.dirname(filename),
+                "python.exe"
+            )
+
+            if not os.path.isfile(verify_exe):
+                raise FileNotFoundError(
+                    f"Cannot find python.exe next to:\n{filename}"
+                )
+
+        result = subprocess.run(
+            [verify_exe, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        version = (
+            result.stdout.strip()
+            or result.stderr.strip()
+        )
+
+        if result.returncode != 0 or not version.startswith("Python "):
+            raise RuntimeError(
+                f"Invalid Python interpreter:\n{filename}\n{version}"
+            )
+
+        return version
 
 def main():
     root = tk.Tk()
     app = PythonScriptRunner(root)
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()

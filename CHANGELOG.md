@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-11-16
+
+### Added
+- **Asynchronous Interpreter Validation**: Python interpreter selection is now verified in a background thread to prevent the GUI from freezing.
+- **Interpreter Verification Feedback**: Added a progress indicator and status message while validating a selected interpreter.
+- **Python Executable Compatibility**: Added explicit support for validating `pythonw.exe` using the corresponding `python.exe`.
+
+### Changed
+- Temporarily disables script execution while a Python interpreter is being verified.
+- Keeps the Stop button available for already running scripts during interpreter verification.
+- Prevents scripts from being launched by double-clicking while interpreter verification is in progress.
+- Improved interpreter validation with version checks, error reporting, and a timeout.
+- Improved GUI updates when displaying script output and completion messages.
+
+### Fixed
+- Fixed issues when switching between multiple installed Python versions.
+- Fixed interpreter validation failures when selecting `pythonw.exe`.
+- Fixed potential GUI freezes during interpreter verification.
+- Fixed unsafe direct console updates from background execution threads.
+
 ## [1.1.0] - 2024-12-05
 
 ### Added
@@ -69,4 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-based script execution for non-blocking UI
 - Process dictionary for managing multiple concurrent scripts
 
-[1.0.0]: https://github.com/yourusername/easy-python-launcher/releases/tag/v1.0.0
+[1.1.1]: https://github.com/madebyvince/EasyPythonLauncher/releases/tag/v1.1.1
+[1.1.0]: https://github.com/madebyvince/EasyPythonLauncher/releases/tag/v1.1.0
+[1.0.0]: https://github.com/madebyvince/EasyPythonLauncher/releases/tag/v1.0.0
